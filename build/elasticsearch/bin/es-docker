@@ -1,23 +1,54 @@
 #!/bin/bash
 
-# Run Elasticsearch and allow setting default settings via env vars
+# Allow two different ways of defining Elasticsearch (-E type) settings using Docker env vars.
+# 1. As defined in the configuration files[1].
+#    Setting the docker env var cluster.name=testcluster will invoke Elasticsearch with:
+#    bin/elasticsearch -Ecluster.name=testcluster
 #
-# e.g. Setting the env var cluster.name=testcluster
+# 2. Using the ess__ prefix and replacing dots with __.
+#    This helps with shells and Kubernetes[2] that don't accept dots in env var names.
+#    Note the use of __ as a delimiter as Elasticsearch has settings already using _.
 #
-# will cause Elasticsearch to be invoked with -Ecluster.name=testcluster
+# Additionally pass through a couple of Elasticsearch parameters that don't have any dots.
 #
-# see https://www.elastic.co/guide/en/elasticsearch/reference/current/settings.html#_setting_default_settings
+# [1]: https://www.elastic.co/guide/en/elasticsearch/reference/current/settings.html#_setting_default_settings
+# [2]: https://github.com/kubernetes/kubernetes/issues/2707#issuecomment-285309156
 
 es_opts=''
+
+es_monadic_params=(
+    pidfile
+    processors
+)
+
+# Based on http://stackoverflow.com/a/14367368 !
+# Function to check if parameter $1 exists in the array passed as parameter $2
+item_in_array () {
+    local item
+    for item in "${@:2}"; do
+        if [[ "$item" == "$1" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 while IFS='=' read -r envvar_key envvar_value
 do
     # Elasticsearch env vars need to have at least two dot separated lowercase words, e.g. `cluster.name`
-    if [[ "$envvar_key" =~ ^[a-z]+\.[a-z]+ ]]
+    # A few params though, such as pidfile, don't contain a dot. Pass those as well.
+    if [[ "$envvar_key" =~ ^[a-z]+\.[a-z]+ ]] || item_in_array "$envvar_key" "${es_monadic_params[@]}"
     then
         if [[ ! -z $envvar_value ]]; then
           es_opt="-E${envvar_key}=${envvar_value}"
           es_opts+=" ${es_opt}"
+        fi
+    # Convert env vars using the ess__ scheme to -E parameters that can be understood by Elasticsearch
+    elif [[ "$envvar_key" =~ ^ess__[a-zA-Z0-9_]+ ]]; then
+        if [[ ! -z $envvar_value ]]; then
+            stripped_envvar_key="${envvar_key#ess__}" # First strip the ess__ prefix
+            es_opt="-E${stripped_envvar_key//__/.}=${envvar_value}" # Then replace all __ with . and generate -E parameter
+            es_opts+=" ${es_opt}"
         fi
     fi
 done < <(env)
