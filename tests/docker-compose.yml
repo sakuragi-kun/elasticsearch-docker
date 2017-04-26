@@ -12,6 +12,8 @@ services:
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
       # Also try a shell-friendly variable.
       - ess__cluster__name=docker-test-cluster
+      # And don't parse non-whitelisted parameters without dots
+      - irrelevantsetting=foo
 
     # Expose elasticsearch to the host system, so that the test suite can see it.
     ports:
@@ -21,4 +23,5 @@ services:
     environment:
       - node.name=docker-test-node-2
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - irrelevantsetting=foo
       - ess__cluster__name=docker-test-cluster

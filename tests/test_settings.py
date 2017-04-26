@@ -15,6 +15,11 @@ def test_setting_heapsize_with_an_environment_variable(elasticsearch):
     assert bool(heap_max_in_bytes)
 
 
-def test_ES_CLUSTER_NAME_environment_variable(elasticsearch):
+def test__ess__cluster__name_with_an_environment_variable(elasticsearch):
     # The fixture for this test comes from tests/docker-compose.yml
     assert elasticsearch.get_root_page()['cluster_name'] == ('docker-test-cluster')
+
+
+def test_non_whitelisted_setting_without_dot_with_an_environment_variable(elasticsearch):
+    # The fixture for this test comes from tests/docker-compose.yml
+    assert 'irrelevantsetting' not in elasticsearch.es_cmdline()
